@@ -1,4 +1,4 @@
-name: Capture Real content.tar.gz
+name: Capture content.tar.gz v2
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install chromium
 
-    - name: Capture content.tar.gz from live game
+    - name: Capture content.tar.gz
       run: |
         node -e '
         const { chromium } = require("playwright");
@@ -34,38 +34,44 @@ jobs:
 
         (async () => {
           const browser = await chromium.launch();
-          const context = await browser.newContext();
-          const page = await context.newPage();
+          const page = await browser.newPage();
 
-          let captured = false;
-
-          // Intercept the exact response for content.tar.gz
-          page.on("response", async (response) => {
-            const url = response.url();
-            if (url.includes("/content.tar.gz")) {
-              const buffer = await response.body();
-              fs.mkdirSync("sonic4-complete", { recursive: true });
-              fs.writeFileSync("sonic4-complete/content.tar.gz", buffer);
-              console.log("Captured content.tar.gz (" + buffer.length + " bytes)");
-              captured = true;
+          // Log all /sonic4/ responses for visibility
+          page.on("response", (resp) => {
+            const url = resp.url();
+            if (url.includes("/sonic4/")) {
+              console.log("Response:", resp.status(), url.substring(0, 100));
             }
           });
 
-          // Navigate and wait for the update check, then let the game request content
           await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
-          await page.waitForTimeout(5000);  // allow time for update check and content fetch
+
+          try {
+            console.log("Waiting for content.tar.gz...");
+            const response = await page.waitForResponse(
+              resp => resp.url().includes("/content.tar.gz"),
+              { timeout: 30000 }   // wait up to 30 seconds
+            );
+            const buffer = await response.body();
+            fs.mkdirSync("sonic4-complete", { recursive: true });
+            fs.writeFileSync("sonic4-complete/content.tar.gz", buffer);
+            console.log("Captured content.tar.gz, size:", buffer.length);
+          } catch (e) {
+            console.error("Did not capture content.tar.gz. Response list above may show why.");
+          }
 
           await browser.close();
-          if (!captured) {
-            console.error("content.tar.gz not captured. Trying to trigger update check...");
-          }
         })();
         '
 
-    - name: Commit and push content.tar.gz
+    - name: Commit and push (only if file exists)
       run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add sonic4-complete/content.tar.gz
-        git commit -m "Add real content.tar.gz from live site" || echo "Nothing to commit"
-        git push
+        if [ -f sonic4-complete/content.tar.gz ]; then
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sonic4-complete/content.tar.gz
+          git commit -m "Add real content.tar.gz" || echo "Nothing to commit"
+          git push
+        else
+          echo "content.tar.gz was not captured, skipping commit."
+        fi
