@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (Final v4)
+name: Build WASM with Local Content (Final v5)
 
 on:
   workflow_dispatch:
@@ -15,25 +15,27 @@ jobs:
         lfs: true
         submodules: false
 
-    - name: Setup .NET 9
+    - name: Setup .NET 7 and .NET 9 SDKs
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '9.0.x'
+        dotnet-version: |
+          7.0.x
+          9.0.x
 
-    - name: Lock SDK version to .NET 9
+    - name: Lock main project to .NET 9
       run: |
         echo '{"sdk":{"version":"9.0.100"}}' > global.json
         dotnet --version
 
-    - name: Clone FNA (specific .NET 9 compatible commit)
+    - name: Clone FNA (specific .NET 7 compatible commit)
       run: |
         git clone https://github.com/WamWooWam/FNA.git Submodules/FNA
         cd Submodules/FNA
         git checkout 061bd1f6e4c85b5dccc9ed7325b1043a5f9f1a6e
         cd ../..
 
-    - name: Install wasm-tools workload
-      run: dotnet workload install wasm-tools
+    - name: Restore workloads (auto‑installs wasm-tools for both 7 and 9)
+      run: dotnet workload restore Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj
 
     - name: Publish WASM project
       run: |
