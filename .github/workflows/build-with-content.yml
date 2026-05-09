@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (Final)
+name: Build WASM with Local Content (Final v2)
 
 on:
   workflow_dispatch:
@@ -17,25 +17,30 @@ jobs:
       with:
         dotnet-version: '9.0.x'
 
-    - name: Check .NET version
+    - name: Verify .NET version
       run: dotnet --version
 
     - name: Install required workload (wasm-tools-net9)
       run: dotnet workload install wasm-tools-net9
 
-    - name: (Optional) Restore workloads from project
-      run: dotnet workload restore Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj
-
     - name: List installed workloads
       run: dotnet workload list
 
-    - name: Setup Emscripten
-      uses: mymindstorm/setup-emsdk@v14
+    - name: Setup Emscripten (official action)
+      uses: emscripten-core/setup-emsdk@v2
       with:
         version: 3.1.45
 
-    - name: Publish WASM project
-      run: dotnet publish Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj -c Release -o ./publish
+    - name: Check Emscripten availability
+      run: emcc --version
+
+    - name: Publish WASM project (with detailed logs)
+      shell: bash
+      run: |
+        dotnet publish Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj \
+          -c Release \
+          -o ./publish \
+          -v detailed 2>&1
 
     - name: Prepare final web folder
       shell: bash
