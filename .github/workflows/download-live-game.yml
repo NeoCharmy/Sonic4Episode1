@@ -1,18 +1,78 @@
-name: Download Latest Pre-Built Game from Live Site
+name: Download Full Game (Playwright)
 
 on:
   workflow_dispatch:
 
 jobs:
-  mirror:
+  download:
     runs-on: ubuntu-latest
     steps:
-    - name: Mirror the live game folder
-      run: |
-        wget --mirror --page-requisites --adjust-extension --no-parent --convert-links --no-host-directories --directory-prefix=sonic4_live https://wamwoowam.co.uk/sonic4/
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
 
-    - name: Upload mirrored game as artifact
+    - name: Install Playwright
+      run: |
+        npm init -y
+        npm install playwright
+
+    - name: Install Playwright browsers
+      run: npx playwright install chromium
+
+    - name: Download game files using Playwright
+      run: |
+        node -e "
+        const { chromium } = require('playwright');
+        const fs = require('fs');
+        const path = require('path');
+        const url = require('url');
+
+        (async () => {
+          const browser = await chromium.launch();
+          const context = await browser.newContext();
+          const page = await context.newPage();
+
+          // Create output directory
+          const outputDir = 'game_snapshot';
+          if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+
+          // Intercept network responses and save files
+          page.on('response', async (response) => {
+            const requestUrl = response.url();
+            // Only save files from the sonic4 path
+            if (!requestUrl.includes('/sonic4/')) return;
+
+            const parsed = new url.URL(requestUrl);
+            let relativePath = parsed.pathname.replace(/^\/sonic4\//, '');
+            if (relativePath === '' || relativePath.endsWith('/')) relativePath += 'index.html';
+
+            const filePath = path.join(outputDir, relativePath);
+            // Ensure directory exists
+            const dir = path.dirname(filePath);
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+            try {
+              const buffer = await response.body();
+              fs.writeFileSync(filePath, buffer);
+              console.log('Saved:', relativePath, '(', buffer.length, 'bytes)');
+            } catch (e) {
+              console.error('Failed to save', relativePath, e.message);
+            }
+          });
+
+          // Navigate and wait for the game to fully load
+          await page.goto('https://wamwoowam.co.uk/sonic4/', { waitUntil: 'networkidle' });
+          // Extra wait for any lazy-loaded assets
+          await page.waitForTimeout(10000);
+
+          await browser.close();
+          console.log('Download complete.');
+        })();
+        "
+
+    - name: Upload full game artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Sonic4-Latest
-        path: sonic4_live/
+        name: Sonic4-Full-Game
+        path: game_snapshot/
