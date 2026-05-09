@@ -1,4 +1,4 @@
-name: Capture Full Game from Live Site
+name: Capture Complete Game
 
 on:
   workflow_dispatch:
@@ -12,8 +12,6 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -28,73 +26,59 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install chromium
 
-    - name: Capture entire game with Playwright
+    - name: Capture all game files
       run: |
-        node -e "
-        const { chromium } = require('playwright');
-        const fs = require('fs');
-        const path = require('path');
-        const url = require('url');
+        node -e '
+        const { chromium } = require("playwright");
+        const fs = require("fs");
+        const path = require("path");
+        const url = require("url");
 
         (async () => {
           const browser = await chromium.launch();
           const context = await browser.newContext();
           const page = await context.newPage();
 
-          const outputDir = 'full-game';
+          const outputDir = "sonic4-complete";
           if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 
-          // Capture all responses for /sonic4/ folder
-          page.on('response', async (response) => {
+          // Intercept every response and save it
+          page.on("response", async (response) => {
             const requestUrl = response.url();
-            if (!requestUrl.includes('/sonic4/')) return;
-
-            const parsed = new url.URL(requestUrl);
-            let relativePath = parsed.pathname.replace(/^\/sonic4\//, '');
-            if (relativePath === '' || relativePath.endsWith('/')) relativePath += 'index.html';
-            // Remove query string and hash from path
-            relativePath = relativePath.split('?')[0].split('#')[0];
-
-            const filePath = path.join(outputDir, relativePath);
-            const dir = path.dirname(filePath);
-            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            if (!requestUrl.includes("/sonic4/")) return;
 
             try {
+              const parsed = new url.URL(requestUrl);
+              let relativePath = parsed.pathname.replace(/^\/sonic4\//, "");
+              if (!relativePath || relativePath.endsWith("/")) relativePath += "index.html";
+              // Remove query strings
+              relativePath = relativePath.split("?")[0].split("#")[0];
+
+              const filePath = path.join(outputDir, relativePath);
+              const dir = path.dirname(filePath);
+              if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
               const buffer = await response.body();
               fs.writeFileSync(filePath, buffer);
-              console.log('Saved:', relativePath, '(' + buffer.length + ' bytes)');
+              console.log(`Saved: ${relativePath} (${buffer.length} bytes)`);
             } catch (e) {
-              console.error('Failed to save', relativePath, e.message);
+              console.error(`Skip: ${requestUrl} - ${e.message}`);
             }
           });
 
-          // Go to the game and wait for absolutely everything
-          await page.goto('https://wamwoowam.co.uk/sonic4/', { waitUntil: 'networkidle' });
-          // Extra wait for Blazor to fully initialize and download all assets
-          await page.waitForTimeout(15000);
-
-          // Optional: click or interact to ensure all lazy modules load
-          // but networkidle + wait should cover it
+          // Go to game and wait really long for all lazy modules
+          await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
+          await page.waitForTimeout(20000);  // 20 seconds for all WASM / dat files
 
           await browser.close();
-          console.log('Capture complete. Total files saved in full-game/');
+          console.log("Done. Check sonic4-complete folder.");
         })();
-        "
+        '
 
-    - name: Remove any previous full-game folder in repo
-      run: rm -rf full-game
-
-    - name: Move captured folder into repo root
-      run: |
-        mkdir -p repo-files
-        cp -r full-game repo-files/
-        rm -rf full-game
-        mv repo-files/full-game .
-
-    - name: Commit and push full-game folder
+    - name: Commit captured game to repo
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add full-game/
-        git commit -m "Add complete game files from live site" || echo "No changes to commit"
+        git add sonic4-complete/
+        git commit -m "Add complete Sonic 4 game files" || echo "Nothing to commit"
         git push
