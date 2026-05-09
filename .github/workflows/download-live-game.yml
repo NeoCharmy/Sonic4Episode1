@@ -1,4 +1,4 @@
-name: Fetch Extra Game Files (js, service-worker)
+name: Capture Full Game from Live Site
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  fetch-and-commit:
+  capture:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
@@ -15,28 +15,86 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Download service-worker.js and js folder
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Playwright
       run: |
-        mkdir -p extra_files/js
+        npm init -y
+        npm install playwright
 
-        # Download service-worker.js
-        wget -nv --header="User-Agent: Mozilla/5.0" \
-          "https://wamwoowam.co.uk/sonic4/service-worker.js" \
-          -O extra_files/service-worker.js
+    - name: Install Playwright browsers
+      run: npx playwright install chromium
 
-        # Download entire js/ directory (recursive, no parent, keep structure)
-        cd extra_files/js
-        wget --recursive --level=1 --no-parent --no-host-directories \
-             --header="User-Agent: Mozilla/5.0" \
-             "https://wamwoowam.co.uk/sonic4/js/"
-        # Move files up if they end up in a nested 'js' folder
-        if [ -d "js" ]; then mv js/* . && rm -r js; fi
-        cd ../..
+    - name: Capture entire game with Playwright
+      run: |
+        node -e "
+        const { chromium } = require('playwright');
+        const fs = require('fs');
+        const path = require('path');
+        const url = require('url');
 
-    - name: Commit and push to repo
+        (async () => {
+          const browser = await chromium.launch();
+          const context = await browser.newContext();
+          const page = await context.newPage();
+
+          const outputDir = 'full-game';
+          if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+
+          // Capture all responses for /sonic4/ folder
+          page.on('response', async (response) => {
+            const requestUrl = response.url();
+            if (!requestUrl.includes('/sonic4/')) return;
+
+            const parsed = new url.URL(requestUrl);
+            let relativePath = parsed.pathname.replace(/^\/sonic4\//, '');
+            if (relativePath === '' || relativePath.endsWith('/')) relativePath += 'index.html';
+            // Remove query string and hash from path
+            relativePath = relativePath.split('?')[0].split('#')[0];
+
+            const filePath = path.join(outputDir, relativePath);
+            const dir = path.dirname(filePath);
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+            try {
+              const buffer = await response.body();
+              fs.writeFileSync(filePath, buffer);
+              console.log('Saved:', relativePath, '(' + buffer.length + ' bytes)');
+            } catch (e) {
+              console.error('Failed to save', relativePath, e.message);
+            }
+          });
+
+          // Go to the game and wait for absolutely everything
+          await page.goto('https://wamwoowam.co.uk/sonic4/', { waitUntil: 'networkidle' });
+          // Extra wait for Blazor to fully initialize and download all assets
+          await page.waitForTimeout(15000);
+
+          // Optional: click or interact to ensure all lazy modules load
+          // but networkidle + wait should cover it
+
+          await browser.close();
+          console.log('Capture complete. Total files saved in full-game/');
+        })();
+        "
+
+    - name: Remove any previous full-game folder in repo
+      run: rm -rf full-game
+
+    - name: Move captured folder into repo root
+      run: |
+        mkdir -p repo-files
+        cp -r full-game repo-files/
+        rm -rf full-game
+        mv repo-files/full-game .
+
+    - name: Commit and push full-game folder
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add extra_files/
-        git commit -m "Add service-worker.js and js folder" || echo "No changes to commit"
+        git add full-game/
+        git commit -m "Add complete game files from live site" || echo "No changes to commit"
         git push
