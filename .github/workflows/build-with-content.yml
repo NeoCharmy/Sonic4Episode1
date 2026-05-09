@@ -1,0 +1,42 @@
+name: Build WASM with Local Content
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-engine:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 9
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Install WASI workload
+      run: dotnet workload install wasi-wasm
+
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.45
+
+    - name: Publish WASM project
+      run: dotnet publish Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj -c Release -o ./publish
+
+    - name: Prepare final web folder
+      shell: bash
+      run: |
+        mkdir -p ./wwwroot
+        cp -r ./publish/* ./wwwroot/
+        rm -rf ./wwwroot/content
+        mkdir -p ./wwwroot/content
+        echo "Put your local 'Content' folder here." > ./wwwroot/content/README.txt
+
+    - name: Upload web game files
+      uses: actions/upload-artifact@v4
+      with:
+        name: web-game-files
+        path: ./wwwroot/
