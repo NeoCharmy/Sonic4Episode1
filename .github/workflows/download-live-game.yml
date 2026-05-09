@@ -1,4 +1,4 @@
-name: Capture content.tar.gz v2
+name: Capture and Split content.tar.gz
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  capture:
+  capture-and-split:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
@@ -36,12 +36,10 @@ jobs:
           const browser = await chromium.launch();
           const page = await browser.newPage();
 
-          // Log all /sonic4/ responses for visibility
           page.on("response", (resp) => {
             const url = resp.url();
-            if (url.includes("/sonic4/")) {
+            if (url.includes("/sonic4/"))
               console.log("Response:", resp.status(), url.substring(0, 100));
-            }
           });
 
           await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
@@ -50,28 +48,31 @@ jobs:
             console.log("Waiting for content.tar.gz...");
             const response = await page.waitForResponse(
               resp => resp.url().includes("/content.tar.gz"),
-              { timeout: 30000 }   // wait up to 30 seconds
+              { timeout: 30000 }
             );
             const buffer = await response.body();
             fs.mkdirSync("sonic4-complete", { recursive: true });
             fs.writeFileSync("sonic4-complete/content.tar.gz", buffer);
             console.log("Captured content.tar.gz, size:", buffer.length);
           } catch (e) {
-            console.error("Did not capture content.tar.gz. Response list above may show why.");
+            console.error("Did not capture content.tar.gz:", e.message);
+            process.exit(1);
           }
 
           await browser.close();
         })();
         '
 
-    - name: Commit and push (only if file exists)
+    - name: Split file into 90 MB chunks
       run: |
-        if [ -f sonic4-complete/content.tar.gz ]; then
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add sonic4-complete/content.tar.gz
-          git commit -m "Add real content.tar.gz" || echo "Nothing to commit"
-          git push
-        else
-          echo "content.tar.gz was not captured, skipping commit."
-        fi
+        cd sonic4-complete
+        split -b 90M content.tar.gz content.tar.gz.part
+        ls -lh content.tar.gz.part*
+
+    - name: Commit chunks to repo
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add sonic4-complete/content.tar.gz.part*
+        git commit -m "Add split content.tar.gz chunks" || echo "Nothing to commit"
+        git push
