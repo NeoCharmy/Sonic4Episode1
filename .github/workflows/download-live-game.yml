@@ -1,4 +1,4 @@
-name: Capture Complete Game
+name: Fetch Missing Native WASM Files
 
 on:
   workflow_dispatch:
@@ -7,78 +7,31 @@ permissions:
   contents: write
 
 jobs:
-  capture:
+  fetch:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-
-    - name: Install Playwright
+    - name: Download missing .wasm files
       run: |
-        npm init -y
-        npm install playwright
+        # List of missing files from console errors
+        FILES=(
+          "dotnet.native.tirckj5p90.wasm"
+          "dotnet.native.tircmj5p90.wasm"
+          # Add any other missing hash names here if more appear
+        )
+        mkdir -p sonic4-complete/_framework
+        for f in "${FILES[@]}"; do
+          wget -nv --header="User-Agent: Mozilla/5.0" \
+            "https://wamwoowam.co.uk/sonic4/_framework/$f" \
+            -O "sonic4-complete/_framework/$f" || echo "FAILED to download $f"
+        done
 
-    - name: Install Playwright browsers
-      run: npx playwright install chromium
-
-    - name: Capture all game files
-      run: |
-        node -e '
-        const { chromium } = require("playwright");
-        const fs = require("fs");
-        const path = require("path");
-        const url = require("url");
-
-        (async () => {
-          const browser = await chromium.launch();
-          const context = await browser.newContext();
-          const page = await context.newPage();
-
-          const outputDir = "sonic4-complete";
-          if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
-
-          // Intercept every response and save it
-          page.on("response", async (response) => {
-            const requestUrl = response.url();
-            if (!requestUrl.includes("/sonic4/")) return;
-
-            try {
-              const parsed = new url.URL(requestUrl);
-              let relativePath = parsed.pathname.replace(/^\/sonic4\//, "");
-              if (!relativePath || relativePath.endsWith("/")) relativePath += "index.html";
-              // Remove query strings
-              relativePath = relativePath.split("?")[0].split("#")[0];
-
-              const filePath = path.join(outputDir, relativePath);
-              const dir = path.dirname(filePath);
-              if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-              const buffer = await response.body();
-              fs.writeFileSync(filePath, buffer);
-              console.log(`Saved: ${relativePath} (${buffer.length} bytes)`);
-            } catch (e) {
-              console.error(`Skip: ${requestUrl} - ${e.message}`);
-            }
-          });
-
-          // Go to game and wait really long for all lazy modules
-          await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
-          await page.waitForTimeout(20000);  // 20 seconds for all WASM / dat files
-
-          await browser.close();
-          console.log("Done. Check sonic4-complete folder.");
-        })();
-        '
-
-    - name: Commit captured game to repo
+    - name: Commit and push
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add sonic4-complete/
-        git commit -m "Add complete Sonic 4 game files" || echo "Nothing to commit"
+        git add sonic4-complete/_framework/
+        git commit -m "Add missing native WASM files" || echo "Nothing to commit"
         git push
