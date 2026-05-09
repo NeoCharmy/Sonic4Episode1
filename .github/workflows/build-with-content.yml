@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (Final v2)
+name: Build WASM with Local Content (LFS Fixed)
 
 on:
   workflow_dispatch:
@@ -9,38 +9,43 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-    - name: Checkout code
+    - name: Checkout code (with LFS)
       uses: actions/checkout@v4
+      with:
+        lfs: true
 
     - name: Setup .NET 9
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '9.0.x'
 
-    - name: Verify .NET version
-      run: dotnet --version
-
-    - name: Install required workload (wasm-tools-net9)
+    - name: Install required workload
       run: dotnet workload install wasm-tools-net9
-
-    - name: List installed workloads
-      run: dotnet workload list
 
     - name: Setup Emscripten (official action)
       uses: emscripten-core/setup-emsdk@v2
       with:
         version: 3.1.45
 
-    - name: Check Emscripten availability
-      run: emcc --version
+    - name: Verify native libraries exist
+      shell: pwsh
+      run: |
+        Write-Host "Checking for native .a files..."
+        if (Test-Path Sonic4Episode1.Wasm/lib/wasm/SDL2.a) {
+          Write-Host "SDL2.a found. Size: $( (Get-Item Sonic4Episode1.Wasm/lib/wasm/SDL2.a).Length ) bytes"
+        } else {
+          Write-Error "SDL2.a is missing! LFS checkout may have failed."
+        }
+        if (Test-Path Sonic4Episode1.Wasm/lib/wasm/FNA3D.a) { Write-Host "FNA3D.a found." } else { Write-Error "FNA3D.a missing!" }
 
-    - name: Publish WASM project (with detailed logs)
+    - name: Publish WASM project
       shell: bash
       run: |
         dotnet publish Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj \
           -c Release \
+          -r browser-wasm \
           -o ./publish \
-          -v detailed 2>&1
+          -v d 2>&1
 
     - name: Prepare final web folder
       shell: bash
