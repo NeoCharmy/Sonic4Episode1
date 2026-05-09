@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (LFS Fixed)
+name: Build WASM with Local Content (Submodules Fixed)
 
 on:
   workflow_dispatch:
@@ -9,10 +9,11 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-    - name: Checkout code (with LFS)
+    - name: Checkout code (with LFS and submodules)
       uses: actions/checkout@v4
       with:
         lfs: true
+        submodules: 'recursive'
 
     - name: Setup .NET 9
       uses: actions/setup-dotnet@v4
@@ -44,8 +45,7 @@ jobs:
         dotnet publish Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj \
           -c Release \
           -r browser-wasm \
-          -o ./publish \
-          -v d 2>&1
+          -o ./publish
 
     - name: Prepare final web folder
       shell: bash
