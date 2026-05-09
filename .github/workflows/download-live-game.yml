@@ -1,29 +1,35 @@
-name: Download Sonic4 Engine Files
+name: Fetch Engine and Commit to Repo
 
 on:
   workflow_dispatch:
 
 jobs:
-  fetch-engine:
+  fetch-and-commit:
     runs-on: ubuntu-latest
     steps:
-    - name: Download _framework folder from live site
-      run: |
-        wget --recursive --level=1 --no-parent --no-host-directories \
-             --directory-prefix=engine \
-             --accept "*.js,*.wasm,*.json,*.dat,*.pdb" \
-             https://wamwoowam.co.uk/sonic4/_framework/
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: (Fallback) Download known essential files manually
+    - name: Download _framework and index.html from live site
       run: |
         mkdir -p engine/_framework
-        cd engine/_framework
-        for file in dotnet.js dotnet.wasm dotnet.native.wasm blazor.boot.json dotnet.runtime.js icudt.dat icudt_CJK.dat; do
-          wget -nv "https://wamwoowam.co.uk/sonic4/_framework/$file" || echo "Skipping $file (not found)"
+        cd engine
+        # Download index.html (will contain redirect script, we'll fix later)
+        wget -nv --header="User-Agent: Mozilla/5.0" \
+             "https://wamwoowam.co.uk/sonic4/index.html" -O index.html
+        cd _framework
+        # Download all known framework files
+        for file in dotnet.js dotnet.wasm dotnet.native.wasm blazor.boot.json dotnet.runtime.js dotnet.runtime.js.map icudt.dat icudt_CJK.dat; do
+          wget -nv --header="User-Agent: Mozilla/5.0" \
+               "https://wamwoowam.co.uk/sonic4/_framework/$file" || echo "$file not found"
         done
 
-    - name: Upload engine artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: sonic4-engine
-        path: engine/
+    - name: Commit and push to repo
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add engine/
+        git commit -m "Add engine files" || echo "No changes to commit"
+        git push
