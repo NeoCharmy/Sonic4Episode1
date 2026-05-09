@@ -1,78 +1,29 @@
-name: Download Full Game (Playwright)
+name: Download Sonic4 Engine Files
 
 on:
   workflow_dispatch:
 
 jobs:
-  download:
+  fetch-engine:
     runs-on: ubuntu-latest
     steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-
-    - name: Install Playwright
+    - name: Download _framework folder from live site
       run: |
-        npm init -y
-        npm install playwright
+        wget --recursive --level=1 --no-parent --no-host-directories \
+             --directory-prefix=engine \
+             --accept "*.js,*.wasm,*.json,*.dat,*.pdb" \
+             https://wamwoowam.co.uk/sonic4/_framework/
 
-    - name: Install Playwright browsers
-      run: npx playwright install chromium
-
-    - name: Download game files using Playwright
+    - name: (Fallback) Download known essential files manually
       run: |
-        node -e "
-        const { chromium } = require('playwright');
-        const fs = require('fs');
-        const path = require('path');
-        const url = require('url');
+        mkdir -p engine/_framework
+        cd engine/_framework
+        for file in dotnet.js dotnet.wasm dotnet.native.wasm blazor.boot.json dotnet.runtime.js icudt.dat icudt_CJK.dat; do
+          wget -nv "https://wamwoowam.co.uk/sonic4/_framework/$file" || echo "Skipping $file (not found)"
+        done
 
-        (async () => {
-          const browser = await chromium.launch();
-          const context = await browser.newContext();
-          const page = await context.newPage();
-
-          // Create output directory
-          const outputDir = 'game_snapshot';
-          if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
-
-          // Intercept network responses and save files
-          page.on('response', async (response) => {
-            const requestUrl = response.url();
-            // Only save files from the sonic4 path
-            if (!requestUrl.includes('/sonic4/')) return;
-
-            const parsed = new url.URL(requestUrl);
-            let relativePath = parsed.pathname.replace(/^\/sonic4\//, '');
-            if (relativePath === '' || relativePath.endsWith('/')) relativePath += 'index.html';
-
-            const filePath = path.join(outputDir, relativePath);
-            // Ensure directory exists
-            const dir = path.dirname(filePath);
-            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-            try {
-              const buffer = await response.body();
-              fs.writeFileSync(filePath, buffer);
-              console.log('Saved:', relativePath, '(', buffer.length, 'bytes)');
-            } catch (e) {
-              console.error('Failed to save', relativePath, e.message);
-            }
-          });
-
-          // Navigate and wait for the game to fully load
-          await page.goto('https://wamwoowam.co.uk/sonic4/', { waitUntil: 'networkidle' });
-          // Extra wait for any lazy-loaded assets
-          await page.waitForTimeout(10000);
-
-          await browser.close();
-          console.log('Download complete.');
-        })();
-        "
-
-    - name: Upload full game artifact
+    - name: Upload engine artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Sonic4-Full-Game
-        path: game_snapshot/
+        name: sonic4-engine
+        path: engine/
