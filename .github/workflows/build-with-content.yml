@@ -13,7 +13,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         lfs: true
-        submodules: false   # we will handle FNA manually
+        submodules: false
 
     - name: Setup .NET 9
       uses: actions/setup-dotnet@v4
@@ -28,8 +28,8 @@ jobs:
     - name: Clone FNA (the only required dependency)
       run: git clone https://github.com/WamWooWam/FNA.git Submodules/FNA
 
-    - name: Install wasm-tools-net9 workload
-      run: dotnet workload install wasm-tools-net9
+    - name: Install wasm-tools workload
+      run: dotnet workload install wasm-tools
 
     - name: Setup Emscripten
       uses: emscripten-core/setup-emsdk@v2
