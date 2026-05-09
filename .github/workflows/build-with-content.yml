@@ -8,10 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
 
     - name: Setup .NET 9
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '9.0.x'
 
@@ -19,7 +19,7 @@ jobs:
       run: dotnet workload install wasi-wasm
 
     - name: Setup Emscripten
-      uses: emscripten-core/setup-emsdk@v16
+      uses: mymindstorm/setup-emsdk@v14
       with:
         version: 3.1.45
 
@@ -36,7 +36,7 @@ jobs:
         echo "Put your local 'Content' folder here." > ./wwwroot/content/README.txt
 
     - name: Upload web game files
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v4
       with:
         name: web-game-files
         path: ./wwwroot/
