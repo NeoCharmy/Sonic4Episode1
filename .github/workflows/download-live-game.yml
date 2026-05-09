@@ -1,4 +1,4 @@
-name: Fetch Missing Native WASM Files
+name: Fetch content.tar.gz
 
 on:
   workflow_dispatch:
@@ -13,25 +13,17 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Download missing .wasm files
+    - name: Download content.tar.gz from live site
       run: |
-        # List of missing files from console errors
-        FILES=(
-          "dotnet.native.tirckj5p90.wasm"
-          "dotnet.native.tircmj5p90.wasm"
-          # Add any other missing hash names here if more appear
-        )
-        mkdir -p sonic4-complete/_framework
-        for f in "${FILES[@]}"; do
-          wget -nv --header="User-Agent: Mozilla/5.0" \
-            "https://wamwoowam.co.uk/sonic4/_framework/$f" \
-            -O "sonic4-complete/_framework/$f" || echo "FAILED to download $f"
-        done
+        mkdir -p sonic4-complete
+        wget -nv --header="User-Agent: Mozilla/5.0" \
+          "https://wamwoowam.co.uk/sonic4/content.tar.gz" \
+          -O "sonic4-complete/content.tar.gz"
 
     - name: Commit and push
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add sonic4-complete/_framework/
-        git commit -m "Add missing native WASM files" || echo "Nothing to commit"
+        git add sonic4-complete/content.tar.gz
+        git commit -m "Add content.tar.gz" || echo "Nothing to commit"
         git push
