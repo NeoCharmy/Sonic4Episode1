@@ -1,4 +1,4 @@
-name: Build WASM with Local Content
+name: Build WASM with Local Content (Fixed)
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ jobs:
   build-engine:
     runs-on: ubuntu-latest
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # This removes the Node.js deprecation warning
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # suppresses deprecation warnings
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -17,8 +17,13 @@ jobs:
       with:
         dotnet-version: '9.0.x'
 
-    - name: Install WASI workload
-      run: dotnet workload install wasi-wasm
+    - name: Check .NET version
+      run: dotnet --version
+
+    - name: Install required workloads
+      run: |
+        dotnet workload install wasm-tools
+        dotnet workload list
 
     - name: Setup Emscripten
       uses: mymindstorm/setup-emsdk@v14
@@ -33,6 +38,7 @@ jobs:
       run: |
         mkdir -p ./wwwroot
         cp -r ./publish/* ./wwwroot/
+        # Remove any auto-generated content folder if present
         rm -rf ./wwwroot/content
         mkdir -p ./wwwroot/content
         echo "Put your local 'Content' folder here." > ./wwwroot/content/README.txt
