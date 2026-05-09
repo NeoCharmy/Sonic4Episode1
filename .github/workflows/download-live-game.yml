@@ -1,4 +1,4 @@
-name: Capture and Split content.tar.gz
+name: Capture and Split content.tar.gz (v3)
 
 on:
   workflow_dispatch:
@@ -36,6 +36,7 @@ jobs:
           const browser = await chromium.launch();
           const page = await browser.newPage();
 
+          // Log all /sonic4/ responses for debugging
           page.on("response", (resp) => {
             const url = resp.url();
             if (url.includes("/sonic4/"))
@@ -44,18 +45,22 @@ jobs:
 
           await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
 
+          // Wait extra time for the version check and game logic
+          console.log("Waiting 10 seconds for version check...");
+          await page.waitForTimeout(10000);
+
           try {
-            console.log("Waiting for content.tar.gz...");
+            console.log("Waiting for content.tar.gz (timeout 60s)...");
             const response = await page.waitForResponse(
               resp => resp.url().includes("/content.tar.gz"),
-              { timeout: 30000 }
+              { timeout: 60000 }
             );
             const buffer = await response.body();
             fs.mkdirSync("sonic4-complete", { recursive: true });
             fs.writeFileSync("sonic4-complete/content.tar.gz", buffer);
             console.log("Captured content.tar.gz, size:", buffer.length);
           } catch (e) {
-            console.error("Did not capture content.tar.gz:", e.message);
+            console.error("Failed to capture:", e.message);
             process.exit(1);
           }
 
