@@ -1,4 +1,4 @@
-name: Capture and Split content.tar.gz (v3)
+name: Capture content.tar.gz and Split
 
 on:
   workflow_dispatch:
@@ -36,7 +36,6 @@ jobs:
           const browser = await chromium.launch();
           const page = await browser.newPage();
 
-          // Log all /sonic4/ responses for debugging
           page.on("response", (resp) => {
             const url = resp.url();
             if (url.includes("/sonic4/"))
@@ -44,37 +43,32 @@ jobs:
           });
 
           await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
+          console.log("Waiting 15 seconds for version check...");
+          await page.waitForTimeout(15000);
 
-          // Wait extra time for the version check and game logic
-          console.log("Waiting 10 seconds for version check...");
-          await page.waitForTimeout(10000);
-
-          try {
-            console.log("Waiting for content.tar.gz (timeout 60s)...");
-            const response = await page.waitForResponse(
-              resp => resp.url().includes("/content.tar.gz"),
-              { timeout: 90000 }
-            );
-            const buffer = await response.body();
-            fs.mkdirSync("sonic4-complete", { recursive: true });
-            fs.writeFileSync("sonic4-complete/content.tar.gz", buffer);
-            console.log("Captured content.tar.gz, size:", buffer.length);
-          } catch (e) {
-            console.error("Failed to capture:", e.message);
-            process.exit(1);
-          }
-
+          console.log("Waiting for content.tar.gz (timeout 120s)...");
+          const response = await page.waitForResponse(
+            resp => resp.url().includes("/content.tar.gz"),
+            { timeout: 120000 }
+          );
+          const buffer = await response.body();
+          fs.mkdirSync("sonic4-complete", { recursive: true });
+          fs.writeFileSync("sonic4-complete/content.tar.gz", buffer);
+          console.log("Captured content.tar.gz, size:", buffer.length);
           await browser.close();
         })();
         '
 
-    - name: Split file into 90 MB chunks
+    - name: Split into 90 MB chunks and DELETE original
       run: |
         cd sonic4-complete
         split -b 90M content.tar.gz content.tar.gz.part
+        # REMOVE the large original so it won't be committed
+        rm content.tar.gz
+        echo "Created chunks:"
         ls -lh content.tar.gz.part*
 
-    - name: Commit chunks to repo
+    - name: Commit only the chunks
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
