@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (Final v5)
+name: Build WASM with Local Content (Final v6)
 
 on:
   workflow_dispatch:
@@ -34,8 +34,19 @@ jobs:
         git checkout 061bd1f6e4c85b5dccc9ed7325b1043a5f9f1a6e
         cd ../..
 
-    - name: Restore workloads (auto‑installs wasm-tools for both 7 and 9)
-      run: dotnet workload restore Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj
+    - name: Install wasm-tools for .NET 7 (temporarily switch SDK)
+      run: |
+        # Save the .NET 9 global.json
+        cp global.json global.json.bak
+        # Create a temporary global.json targeting .NET 7
+        echo '{"sdk":{"version":"7.0.100"}}' > global.json
+        dotnet --version
+        dotnet workload install wasm-tools
+        # Restore the .NET 9 global.json
+        mv global.json.bak global.json
+
+    - name: Install wasm-tools for .NET 9
+      run: dotnet workload install wasm-tools
 
     - name: Publish WASM project
       run: |
