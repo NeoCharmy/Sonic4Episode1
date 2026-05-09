@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (Final v6)
+name: Build WASM with Local Content (Final v7)
 
 on:
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
 
     - name: Lock main project to .NET 9
       run: |
-        echo '{"sdk":{"version":"9.0.100"}}' > global.json
+        echo '{"sdk":{"version":"9.0.115"}}' > global.json
         dotnet --version
 
     - name: Clone FNA (specific .NET 7 compatible commit)
@@ -34,15 +34,13 @@ jobs:
         git checkout 061bd1f6e4c85b5dccc9ed7325b1043a5f9f1a6e
         cd ../..
 
-    - name: Install wasm-tools for .NET 7 (temporarily switch SDK)
+    - name: Install wasm-tools for .NET 7 (temporary SDK switch)
       run: |
-        # Save the .NET 9 global.json
         cp global.json global.json.bak
-        # Create a temporary global.json targeting .NET 7
-        echo '{"sdk":{"version":"7.0.100"}}' > global.json
+        # Use the installed version 7.0.410 (not 7.0.100)
+        echo '{"sdk":{"version":"7.0.410"}}' > global.json
         dotnet --version
         dotnet workload install wasm-tools
-        # Restore the .NET 9 global.json
         mv global.json.bak global.json
 
     - name: Install wasm-tools for .NET 9
