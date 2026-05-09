@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (Submodules Fixed)
+name: Build WASM with Local Content (v3 - Final)
 
 on:
   workflow_dispatch:
@@ -8,8 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      DOTNET_ROOT: ${{ github.workspace }}/.dotnet  # force the installed .NET 9
     steps:
-    - name: Checkout code (with LFS and submodules)
+    - name: Checkout code
       uses: actions/checkout@v4
       with:
         lfs: true
@@ -20,26 +21,52 @@ jobs:
       with:
         dotnet-version: '9.0.x'
 
-    - name: Install required workload
+    - name: Ensure .NET 9 is active
+      shell: bash
+      run: |
+        # Override global.json if present, to lock the SDK version
+        echo '{"sdk":{"version":"9.0.100"}}' > global.json
+        # Show which dotnet is in use
+        dotnet --version
+        dotnet --list-sdks
+
+    - name: Manually initialise submodules (failsafe)
+      shell: bash
+      run: |
+        git submodule sync --recursive
+        git submodule update --init --recursive --force
+
+    - name: Verify submodules and critical files
+      shell: pwsh
+      run: |
+        Write-Host "Listing Submodules/FNA contents:"
+        if (Test-Path Submodules/FNA) {
+          Get-ChildItem -Path Submodules/FNA -Recurse -File | Select-Object FullName | ForEach-Object { Write-Host $_.FullName }
+        } else {
+          Write-Error "Submodules/FNA folder still missing!"
+        }
+        Write-Host "Checking specific CS files:"
+        $files = @(
+          "Sonic4Episode1/appmain/gm/GMD_GAME_FLAG.cs",
+          "Sonic4Episode1/appmain/gm/GMD_TASK_PRIO.cs"
+        )
+        foreach ($f in $files) {
+          if (Test-Path $f) {
+            Write-Host "Found: $f"
+          } else {
+            Write-Error "Missing: $f"
+          }
+        }
+
+    - name: Install wasm-tools-net9 workload
       run: dotnet workload install wasm-tools-net9
 
-    - name: Setup Emscripten (official action)
+    - name: Setup Emscripten
       uses: emscripten-core/setup-emsdk@v2
       with:
         version: 3.1.45
 
-    - name: Verify native libraries exist
-      shell: pwsh
-      run: |
-        Write-Host "Checking for native .a files..."
-        if (Test-Path Sonic4Episode1.Wasm/lib/wasm/SDL2.a) {
-          Write-Host "SDL2.a found. Size: $( (Get-Item Sonic4Episode1.Wasm/lib/wasm/SDL2.a).Length ) bytes"
-        } else {
-          Write-Error "SDL2.a is missing! LFS checkout may have failed."
-        }
-        if (Test-Path Sonic4Episode1.Wasm/lib/wasm/FNA3D.a) { Write-Host "FNA3D.a found." } else { Write-Error "FNA3D.a missing!" }
-
-    - name: Publish WASM project
+    - name: Publish WASM project (using .NET 9)
       shell: bash
       run: |
         dotnet publish Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj \
