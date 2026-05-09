@@ -3,6 +3,9 @@ name: Fetch Engine and Commit to Repo
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   fetch-and-commit:
     runs-on: ubuntu-latest
@@ -16,11 +19,9 @@ jobs:
       run: |
         mkdir -p engine/_framework
         cd engine
-        # Download index.html (will contain redirect script, we'll fix later)
         wget -nv --header="User-Agent: Mozilla/5.0" \
              "https://wamwoowam.co.uk/sonic4/index.html" -O index.html
         cd _framework
-        # Download all known framework files
         for file in dotnet.js dotnet.wasm dotnet.native.wasm blazor.boot.json dotnet.runtime.js dotnet.runtime.js.map icudt.dat icudt_CJK.dat; do
           wget -nv --header="User-Agent: Mozilla/5.0" \
                "https://wamwoowam.co.uk/sonic4/_framework/$file" || echo "$file not found"
