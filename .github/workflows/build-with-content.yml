@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (Fixed)
+name: Build WASM with Local Content (Final)
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ jobs:
   build-engine:
     runs-on: ubuntu-latest
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # suppresses deprecation warnings
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -20,10 +20,14 @@ jobs:
     - name: Check .NET version
       run: dotnet --version
 
-    - name: Install required workloads
-      run: |
-        dotnet workload install wasm-tools
-        dotnet workload list
+    - name: Install required workload (wasm-tools-net9)
+      run: dotnet workload install wasm-tools-net9
+
+    - name: (Optional) Restore workloads from project
+      run: dotnet workload restore Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj
+
+    - name: List installed workloads
+      run: dotnet workload list
 
     - name: Setup Emscripten
       uses: mymindstorm/setup-emsdk@v14
@@ -38,7 +42,6 @@ jobs:
       run: |
         mkdir -p ./wwwroot
         cp -r ./publish/* ./wwwroot/
-        # Remove any auto-generated content folder if present
         rm -rf ./wwwroot/content
         mkdir -p ./wwwroot/content
         echo "Put your local 'Content' folder here." > ./wwwroot/content/README.txt
