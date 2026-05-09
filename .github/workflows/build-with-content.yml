@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (Final v8)
+name: Build WASM from Original Source (Ultimate)
 
 on:
   workflow_dispatch:
@@ -9,11 +9,13 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-    - name: Checkout code (no submodules)
+    - name: Checkout original Sonic4Episode1 source (no submodules)
       uses: actions/checkout@v4
       with:
+        repository: WanKerr/Sonic4Episode1
         lfs: true
         submodules: false
+        path: original
 
     - name: Setup .NET 7 and .NET 9 SDKs
       uses: actions/setup-dotnet@v4
@@ -27,14 +29,13 @@ jobs:
         echo '{"sdk":{"version":"9.0.115"}}' > global.json
         dotnet --version
 
-    - name: Clone FNA with its submodules (recursive)
+    - name: Clone FNA with submodules (recursive)
       run: |
-        git clone --recurse-submodules https://github.com/WamWooWam/FNA.git Submodules/FNA
-        cd Submodules/FNA
+        git clone --recurse-submodules https://github.com/WamWooWam/FNA.git original/Submodules/FNA
+        cd original/Submodules/FNA
         git checkout 061bd1f6e4c85b5dccc9ed7325b1043a5f9f1a6e
-        # Update submodules to match this commit
         git submodule update --init --recursive
-        cd ../..
+        cd ../../..
 
     - name: Install wasm-tools for .NET 7 (temporary SDK switch)
       run: |
@@ -47,24 +48,25 @@ jobs:
     - name: Install wasm-tools for .NET 9
       run: dotnet workload install wasm-tools
 
-    - name: Publish WASM project
+    - name: Publish WASM project (from original source)
+      working-directory: original
       run: |
         dotnet publish Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj \
           -c Release \
           -r browser-wasm \
-          -o ./publish
+          -o ../publish
 
     - name: Prepare final web folder
       shell: bash
       run: |
-        mkdir -p ./wwwroot
-        cp -r ./publish/* ./wwwroot/
-        rm -rf ./wwwroot/content
-        mkdir -p ./wwwroot/content
-        echo "Put your local 'Content' folder here." > ./wwwroot/content/README.txt
+        mkdir -p wwwroot
+        cp -r publish/* wwwroot/
+        rm -rf wwwroot/content
+        mkdir -p wwwroot/content
+        echo "Put your local 'Content' folder here." > wwwroot/content/README.txt
 
     - name: Upload web game files
       uses: actions/upload-artifact@v4
       with:
         name: web-game-files
-        path: ./wwwroot/
+        path: wwwroot/
