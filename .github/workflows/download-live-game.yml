@@ -1,4 +1,4 @@
-name: Fetch Engine and Commit to Repo
+name: Fetch Extra Game Files (js, service-worker)
 
 on:
   workflow_dispatch:
@@ -15,22 +15,28 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Download _framework and index.html from live site
+    - name: Download service-worker.js and js folder
       run: |
-        mkdir -p engine/_framework
-        cd engine
+        mkdir -p extra_files/js
+
+        # Download service-worker.js
         wget -nv --header="User-Agent: Mozilla/5.0" \
-             "https://wamwoowam.co.uk/sonic4/index.html" -O index.html
-        cd _framework
-        for file in dotnet.js dotnet.wasm dotnet.native.wasm blazor.boot.json dotnet.runtime.js dotnet.runtime.js.map icudt.dat icudt_CJK.dat; do
-          wget -nv --header="User-Agent: Mozilla/5.0" \
-               "https://wamwoowam.co.uk/sonic4/_framework/$file" || echo "$file not found"
-        done
+          "https://wamwoowam.co.uk/sonic4/service-worker.js" \
+          -O extra_files/service-worker.js
+
+        # Download entire js/ directory (recursive, no parent, keep structure)
+        cd extra_files/js
+        wget --recursive --level=1 --no-parent --no-host-directories \
+             --header="User-Agent: Mozilla/5.0" \
+             "https://wamwoowam.co.uk/sonic4/js/"
+        # Move files up if they end up in a nested 'js' folder
+        if [ -d "js" ]; then mv js/* . && rm -r js; fi
+        cd ../..
 
     - name: Commit and push to repo
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add engine/
-        git commit -m "Add engine files" || echo "No changes to commit"
+        git add extra_files/
+        git commit -m "Add service-worker.js and js folder" || echo "No changes to commit"
         git push
