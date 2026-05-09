@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (Final v7)
+name: Build WASM with Local Content (Final v8)
 
 on:
   workflow_dispatch:
@@ -27,17 +27,18 @@ jobs:
         echo '{"sdk":{"version":"9.0.115"}}' > global.json
         dotnet --version
 
-    - name: Clone FNA (specific .NET 7 compatible commit)
+    - name: Clone FNA with its submodules (recursive)
       run: |
-        git clone https://github.com/WamWooWam/FNA.git Submodules/FNA
+        git clone --recurse-submodules https://github.com/WamWooWam/FNA.git Submodules/FNA
         cd Submodules/FNA
         git checkout 061bd1f6e4c85b5dccc9ed7325b1043a5f9f1a6e
+        # Update submodules to match this commit
+        git submodule update --init --recursive
         cd ../..
 
     - name: Install wasm-tools for .NET 7 (temporary SDK switch)
       run: |
         cp global.json global.json.bak
-        # Use the installed version 7.0.410 (not 7.0.100)
         echo '{"sdk":{"version":"7.0.410"}}' > global.json
         dotnet --version
         dotnet workload install wasm-tools
