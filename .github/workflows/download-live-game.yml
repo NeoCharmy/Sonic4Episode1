@@ -1,4 +1,4 @@
-name: Capture content.tar.gz and Split
+name: Capture content.tar.gz (Final)
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install chromium
 
-    - name: Capture content.tar.gz
+    - name: Capture content.tar.gz (early listener)
       run: |
         node -e '
         const { chromium } = require("playwright");
@@ -36,21 +36,24 @@ jobs:
           const browser = await chromium.launch();
           const page = await browser.newPage();
 
+          // Log all /sonic4/ responses for debugging (optional)
           page.on("response", (resp) => {
             const url = resp.url();
             if (url.includes("/sonic4/"))
               console.log("Response:", resp.status(), url.substring(0, 100));
           });
 
-          await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
-          console.log("Waiting 15 seconds for version check...");
-          await page.waitForTimeout(15000);
-
-          console.log("Waiting for content.tar.gz (timeout 120s)...");
-          const response = await page.waitForResponse(
+          // *** Start waiting for content.tar.gz BEFORE navigating ***
+          const contentPromise = page.waitForResponse(
             resp => resp.url().includes("/content.tar.gz"),
-            { timeout: 120000 }
+            { timeout: 180000 }   // 3 minutes, just in case
           );
+
+          await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
+          console.log("Page loaded, waiting for content.tar.gz...");
+
+          // This will resolve as soon as the response headers arrive
+          const response = await contentPromise;
           const buffer = await response.body();
           fs.mkdirSync("sonic4-complete", { recursive: true });
           fs.writeFileSync("sonic4-complete/content.tar.gz", buffer);
@@ -59,11 +62,10 @@ jobs:
         })();
         '
 
-    - name: Split into 90 MB chunks and DELETE original
+    - name: Split into 90 MB chunks and delete original
       run: |
         cd sonic4-complete
         split -b 90M content.tar.gz content.tar.gz.part
-        # REMOVE the large original so it won't be committed
         rm content.tar.gz
         echo "Created chunks:"
         ls -lh content.tar.gz.part*
