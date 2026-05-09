@@ -1,4 +1,4 @@
-name: Build WASM with Local Content (FINAL – No Emscripten Action)
+name: Build WASM with Local Content (Final v4)
 
 on:
   workflow_dispatch:
@@ -25,8 +25,12 @@ jobs:
         echo '{"sdk":{"version":"9.0.100"}}' > global.json
         dotnet --version
 
-    - name: Clone FNA (the only required dependency)
-      run: git clone https://github.com/WamWooWam/FNA.git Submodules/FNA
+    - name: Clone FNA (specific .NET 9 compatible commit)
+      run: |
+        git clone https://github.com/WamWooWam/FNA.git Submodules/FNA
+        cd Submodules/FNA
+        git checkout 061bd1f6e4c85b5dccc9ed7325b1043a5f9f1a6e
+        cd ../..
 
     - name: Install wasm-tools workload
       run: dotnet workload install wasm-tools
