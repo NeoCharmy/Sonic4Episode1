@@ -16,10 +16,11 @@ jobs:
     - name: Download Content folder recursively
       run: |
         mkdir -p sonic4-content
-        wget --mirror --no-parent --no-host-directories --directory-prefix=sonic4-content \
-             --header="User-Agent: Mozilla/5.0" \
-             --reject "index.html*" \
+        wget -r -np -nH --cut-dirs=2 \
+             -P sonic4-content \
              --no-verbose \
+             --header="User-Agent: Mozilla/5.0" \
+             --reject 'index.html*' \
              https://wamwoowam.co.uk/sonic4/Content/
  
     - name: Commit and push Content folder
