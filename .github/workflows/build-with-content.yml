@@ -1,4 +1,4 @@
-name: Fetch Complete Content Folder
+name: Capture Full Content Folder from Live Game
 
 on:
   workflow_dispatch:
@@ -7,26 +7,77 @@ permissions:
   contents: write
 
 jobs:
-  fetch:
+  capture:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Download Content folder recursively
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Playwright
       run: |
-        mkdir -p sonic4-content
-        wget -r -np -nH --cut-dirs=2 \
-             -P sonic4-content \
-             --no-verbose \
-             --header="User-Agent: Mozilla/5.0" \
-             --reject 'index.html*' \
-             https://wamwoowam.co.uk/sonic4/Content/
+        npm init -y
+        npm install playwright
+
+    - name: Install Playwright browsers
+      run: npx playwright install chromium
+
+    - name: Capture all Content files
+      run: |
+        node -e '
+        const { chromium } = require("playwright");
+        const fs = require("fs");
+        const path = require("path");
+
+        (async () => {
+          const browser = await chromium.launch();
+          const context = await browser.newContext();
+          const page = await context.newPage();
+
+          // Intercept every response and save files from /s../Content/
+          page.on("response", async (response) => {
+            const url = response.url();
+            if (!url.includes("/sonic4/Content/")) return;
+
+            try {
+              const parsed = new URL(url);
+              // Extract relative path from /sonic4/, preserving Content/...
+              let relativePath = parsed.pathname.replace(/^\/sonic4\//, "");
+              // Remove query string
+              relativePath = relativePath.split("?")[0].split("#")[0];
+              if (!relativePath) return;
+
+              const outputDir = "sonic4-content";
+              const filePath = path.join(outputDir, relativePath);
+              const dir = path.dirname(filePath);
+              if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+              const buffer = await response.body();
+              fs.writeFileSync(filePath, buffer);
+              console.log("Saved:", relativePath, "(" + buffer.length + " bytes)");
+            } catch (e) {
+              console.error("Failed to save", url, e.message);
+            }
+          });
+
+          // Navigate to the game and wait for all content to load
+          await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
+          console.log("Page loaded. Waiting for all assets...");
+          await page.waitForTimeout(20000); // 20 seconds for lazy loads
+
+          await browser.close();
+          console.log("Capture complete.");
+        })();
+        '
 
     - name: Commit and push Content folder
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git add sonic4-content/
-        git commit -m "Add full Content folder from live site" || echo "Nothing to commit"
+        git commit -m "Add full Content folder captured from live site" || echo "Nothing to commit"
         git push
