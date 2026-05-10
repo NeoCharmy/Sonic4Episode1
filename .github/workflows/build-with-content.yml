@@ -1,18 +1,18 @@
 name: Fetch Complete Content Folder
- 
+
 on:
   workflow_dispatch:
- 
+
 permissions:
   contents: write
- 
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
- 
+
     - name: Download Content folder recursively
       run: |
         mkdir -p sonic4-content
@@ -22,12 +22,11 @@ jobs:
              --header="User-Agent: Mozilla/5.0" \
              --reject 'index.html*' \
              https://wamwoowam.co.uk/sonic4/Content/
- 
+
     - name: Commit and push Content folder
       run: |
-        git config user.name
- "github-actions[bot]"        git config user.email
- "github-actions[bot]@users.noreply.github.com
-"        git add sonic4-content/
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add sonic4-content/
         git commit -m "Add full Content folder from live site" || echo "Nothing to commit"
         git push
