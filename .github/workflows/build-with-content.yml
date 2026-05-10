@@ -1,72 +1,32 @@
-name: Build WASM from Original Source (Ultimate)
-
+name: Fetch Complete Content Folder
+ 
 on:
   workflow_dispatch:
-
+ 
+permissions:
+  contents: write
+ 
 jobs:
-  build-engine:
+  fetch:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-    - name: Checkout original Sonic4Episode1 source (no submodules)
+    - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        repository: WanKerr/Sonic4Episode1
-        lfs: true
-        submodules: false
-        path: original
-
-    - name: Setup .NET 7 and .NET 9 SDKs
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          7.0.x
-          9.0.x
-
-    - name: Lock main project to .NET 9
+ 
+    - name: Download Content folder recursively
       run: |
-        echo '{"sdk":{"version":"9.0.115"}}' > global.json
-        dotnet --version
-
-    - name: Clone FNA with submodules (recursive)
+        mkdir -p sonic4-content
+        wget --mirror --no-parent --no-host-directories --directory-prefix=sonic4-content \
+             --header="User-Agent: Mozilla/5.0" \
+             --reject "index.html*" \
+             --no-verbose \
+             https://wamwoowam.co.uk/sonic4/Content/
+ 
+    - name: Commit and push Content folder
       run: |
-        git clone --recurse-submodules https://github.com/WamWooWam/FNA.git original/Submodules/FNA
-        cd original/Submodules/FNA
-        git checkout 061bd1f6e4c85b5dccc9ed7325b1043a5f9f1a6e
-        git submodule update --init --recursive
-        cd ../../..
-
-    - name: Install wasm-tools for .NET 7 (temporary SDK switch)
-      run: |
-        cp global.json global.json.bak
-        echo '{"sdk":{"version":"7.0.410"}}' > global.json
-        dotnet --version
-        dotnet workload install wasm-tools
-        mv global.json.bak global.json
-
-    - name: Install wasm-tools for .NET 9
-      run: dotnet workload install wasm-tools
-
-    - name: Publish WASM project (from original source)
-      working-directory: original
-      run: |
-        dotnet publish Sonic4Episode1.Wasm/Sonic4Episode1.Wasm.csproj \
-          -c Release \
-          -r browser-wasm \
-          -o ../publish
-
-    - name: Prepare final web folder
-      shell: bash
-      run: |
-        mkdir -p wwwroot
-        cp -r publish/* wwwroot/
-        rm -rf wwwroot/content
-        mkdir -p wwwroot/content
-        echo "Put your local 'Content' folder here." > wwwroot/content/README.txt
-
-    - name: Upload web game files
-      uses: actions/upload-artifact@v4
-      with:
-        name: web-game-files
-        path: wwwroot/
+        git config user.name
+ "github-actions[bot]"        git config user.email
+ "github-actions[bot]@users.noreply.github.com
+"        git add sonic4-content/
+        git commit -m "Add full Content folder from live site" || echo "Nothing to commit"
+        git push
