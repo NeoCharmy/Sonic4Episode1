@@ -38,17 +38,16 @@ jobs:
           const context = await browser.newContext();
           const page = await context.newPage();
 
-          // Intercept all responses from the CheerpJ CDN
           page.on("response", async (response) => {
             const url = response.url();
             if (!url.startsWith("https://cjrtnc.leaningtech.com/")) return;
 
             try {
               const parsed = new URL(url);
-              let relativePath = parsed.pathname.replace(/^\//, "");  // e.g. "4.2/loader.js"
+              let relativePath = parsed.pathname.replace(/^\//, "");
               if (!relativePath) return;
 
-              const outputDir = "cheerpj-local";
+              const outputDir = "web/cheerpj-local";
               const filePath = path.join(outputDir, relativePath);
               const dir = path.dirname(filePath);
               if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -61,8 +60,7 @@ jobs:
             }
           });
 
-          // Load your game page (GitHub Pages root)
-          await page.goto("https://neocharmy.github.io/runnersadventure/", { waitUntil: "networkidle" });
+          await page.goto("https://neocharmy.github.io/runnersadventure/web/", { waitUntil: "networkidle" });
           console.log("Page loaded, waiting for CheerpJ to fully initialize...");
           await page.waitForTimeout(15000);
 
@@ -71,15 +69,15 @@ jobs:
         })();
         '
 
-    - name: Replace CDN references in index.html
+    - name: Update index.html to use local runtime
       run: |
-        sed -i 's|https://cjrtnc.leaningtech.com/|cheerpj-local/|g' index.html
+        sed -i 's|https://cjrtnc.leaningtech.com/|cheerpj-local/|g' web/index.html
 
     - name: Commit captured runtime and updated index.html
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add cheerpj-local/
-        git add index.html
+        git add web/cheerpj-local/
+        git add web/index.html
         git commit -m "Add local CheerpJ runtime and offline index.html" || echo "Nothing to commit"
         git push
