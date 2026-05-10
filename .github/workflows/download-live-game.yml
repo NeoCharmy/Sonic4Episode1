@@ -1,4 +1,4 @@
-name: Capture content.tar.gz Directly
+name: Capture Content.tar.gz (Fixed)
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install chromium
 
-    - name: Capture content.tar.gz (direct event)
+    - name: Capture Content.tar.gz (case‑insensitive)
       run: |
         node -e '
         const { chromium } = require("playwright");
@@ -37,12 +37,9 @@ jobs:
           const page = await browser.newPage();
           let captured = false;
 
-          // Intercept the response and save immediately
+          // Intercept every response, save content.tar.gz immediately
           page.on("response", async (response) => {
-            const url = response.url();
-            if (url.includes("/sonic4/")) {
-              console.log("Response:", response.status(), url.substring(0, 100));
-            }
+            const url = response.url().toLowerCase();
             if (url.includes("/content.tar.gz")) {
               console.log("Content archive found, downloading...");
               try {
@@ -58,7 +55,7 @@ jobs:
           });
 
           await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
-          console.log("Page loaded. Waiting 30 seconds for potential downloads...");
+          console.log("Page loaded. Waiting up to 30 seconds for download...");
 
           // Wait up to 30 seconds for the file to be captured
           const start = Date.now();
@@ -77,7 +74,7 @@ jobs:
         })();
         '
 
-    - name: Split into 90 MB chunks and delete original
+    - name: Split into 90 MB chunks
       run: |
         cd sonic4-complete
         split -b 90M content.tar.gz content.tar.gz.part
@@ -85,7 +82,7 @@ jobs:
         echo "Created chunks:"
         ls -lh content.tar.gz.part*
 
-    - name: Commit only the chunks
+    - name: Commit chunks
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
