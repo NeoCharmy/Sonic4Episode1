@@ -1,4 +1,4 @@
-name: Capture Content.tar.gz (Fixed)
+name: Capture Content.tar.gz (page.request)
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install chromium
 
-    - name: Capture Content.tar.gz (case‑insensitive)
+    - name: Download Content.tar.gz using browser context
       run: |
         node -e '
         const { chromium } = require("playwright");
@@ -34,39 +34,28 @@ jobs:
 
         (async () => {
           const browser = await chromium.launch();
-          const page = await browser.newPage();
-          let captured = false;
+          const context = await browser.newContext();
+          const page = await context.newPage();
 
-          // Intercept every response, save content.tar.gz immediately
-          page.on("response", async (response) => {
-            const url = response.url().toLowerCase();
-            if (url.includes("/content.tar.gz")) {
-              console.log("Content archive found, downloading...");
-              try {
-                const buffer = await response.body();
-                fs.mkdirSync("sonic4-complete", { recursive: true });
-                fs.writeFileSync("sonic4-complete/content.tar.gz", buffer);
-                console.log("Saved content.tar.gz, size:", buffer.length);
-                captured = true;
-              } catch (e) {
-                console.error("Failed to save content.tar.gz:", e.message);
-              }
-            }
-          });
-
+          // Navigate and wait for the game to set up any necessary cookies/storage
           await page.goto("https://wamwoowam.co.uk/sonic4/", { waitUntil: "networkidle" });
-          console.log("Page loaded. Waiting up to 30 seconds for download...");
+          console.log("Page loaded. Waiting a few seconds for auth/cookies...");
+          await page.waitForTimeout(5000);
 
-          // Wait up to 30 seconds for the file to be captured
-          const start = Date.now();
-          while (!captured && Date.now() - start < 30000) {
-            await page.waitForTimeout(1000);
-          }
-
-          if (captured) {
-            console.log("Successfully captured content.tar.gz.");
+          // Now use the same browser context to fetch the archive directly
+          const contentUrl = "https://wamwoowam.co.uk/sonic4/Content.tar.gz";
+          console.log("Fetching:", contentUrl);
+          const response = await context.request.get(contentUrl, {
+            timeout: 180000   // 3 minutes for the large file
+          });
+          
+          if (response.ok()) {
+            const buffer = await response.body();
+            fs.mkdirSync("sonic4-complete", { recursive: true });
+            fs.writeFileSync("sonic4-complete/content.tar.gz", buffer);
+            console.log("Saved content.tar.gz, size:", buffer.length);
           } else {
-            console.error("content.tar.gz was not captured within 30 seconds.");
+            console.error("Failed to download. Status:", response.status());
             process.exit(1);
           }
 
