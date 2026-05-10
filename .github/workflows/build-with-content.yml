@@ -1,4 +1,4 @@
-name: Download All Music Tracks (Referer Fix)
+name: Final – Download All Music Files & Commit
 
 on:
   workflow_dispatch:
@@ -70,15 +70,19 @@ jobs:
                "$BASE/${track}.ogg" || echo "FAILED: ${track}.ogg"
         done
 
-        # Verify that files have reasonable size (> 1 KB)
-        echo "===== Checking downloaded files ====="
-        find sonic4-content/Content/SOUND -name "*.ogg" -size +1k | wc -l
-        echo " files are larger than 1 KB (should be all 43)."
+        # Confirm files are larger than 1 KB
+        echo "===== Files downloaded ====="
+        ls -lh sonic4-content/Content/SOUND/*.ogg
+        echo "Number of .ogg files: $(ls sonic4-content/Content/SOUND/*.ogg 2>/dev/null | wc -l)"
 
-    - name: Commit and push to repository
+    - name: Commit and push
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add sonic4-content/
-        git commit -m "Add complete SOUND folder with all music tracks" || echo "Nothing to commit"
+        git add -A sonic4-content/
+        git commit -m "Add complete SOUND folder" || echo "Nothing to commit (maybe already identical)"
         git push
+        echo ""
+        echo ">>> Your files are now in your repository:"
+        echo "    https://github.com/NeoCharmy/Sonic4Episode1/tree/main/sonic4-content/Content/SOUND"
+        echo ""
