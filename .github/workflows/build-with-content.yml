@@ -1,4 +1,4 @@
-name: Fetch Missing Sound Files
+name: Download All Music Tracks (Referer Fix)
 
 on:
   workflow_dispatch:
@@ -13,10 +13,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Download all sound files
+    - name: Download all .ogg music files
       run: |
         BASE="https://wamwoowam.co.uk/sonic4/Content/SOUND"
+        REFERER="https://wamwoowam.co.uk/sonic4/"
         mkdir -p sonic4-content/Content/SOUND
+
         for track in \
           S4EP1_00_Z1A1_Normal_Mixed4816 \
           S4EP1_01_Z1A2_Normal_Mixed4816 \
@@ -61,12 +63,19 @@ jobs:
           S4EP1_40_SuperSonic_Mixed4816 \
           S4EP1_41_CutScene_Mixed4816 \
           SNG_EMERALD; do
-          wget -q --show-progress --header="User-Agent: Mozilla/5.0" \
+          wget --quiet --show-progress \
+               --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+               --header="Referer: $REFERER" \
                -O "sonic4-content/Content/SOUND/${track}.ogg" \
-               "$BASE/${track}.ogg" || echo "Failed to download ${track}.ogg"
+               "$BASE/${track}.ogg" || echo "FAILED: ${track}.ogg"
         done
 
-    - name: Commit and push
+        # Verify that files have reasonable size (> 1 KB)
+        echo "===== Checking downloaded files ====="
+        find sonic4-content/Content/SOUND -name "*.ogg" -size +1k | wc -l
+        echo " files are larger than 1 KB (should be all 43)."
+
+    - name: Commit and push to repository
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
