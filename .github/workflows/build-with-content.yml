@@ -61,8 +61,8 @@ jobs:
             }
           });
 
-          // Open the game page and wait for the emulator to load
-          await page.goto("https://neocharmy.github.io/runnersadventure/web/", { waitUntil: "networkidle" });
+          // Load your game page (GitHub Pages root)
+          await page.goto("https://neocharmy.github.io/runnersadventure/", { waitUntil: "networkidle" });
           console.log("Page loaded, waiting for CheerpJ to fully initialize...");
           await page.waitForTimeout(15000);
 
@@ -73,7 +73,6 @@ jobs:
 
     - name: Replace CDN references in index.html
       run: |
-        cd web
         sed -i 's|https://cjrtnc.leaningtech.com/|cheerpj-local/|g' index.html
 
     - name: Commit captured runtime and updated index.html
@@ -81,6 +80,6 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git add cheerpj-local/
-        git add web/index.html
+        git add index.html
         git commit -m "Add local CheerpJ runtime and offline index.html" || echo "Nothing to commit"
         git push
